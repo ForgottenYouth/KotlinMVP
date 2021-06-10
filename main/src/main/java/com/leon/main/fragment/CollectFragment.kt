@@ -14,6 +14,7 @@ import com.leon.main.collectmvp.impl.CollectModuleImpl
 import com.leon.main.collectmvp.impl.CollectionPresneterImpl
 import com.leon.main.collectmvp.inter.ICollectView
 import com.leon.base.database.Student
+import com.leon.common.utils.toast
 import com.leon.main.databinding.FragmentCollectLayoutBinding
 import kotlinx.android.synthetic.main.fragment_collect_layout.*
 
@@ -42,7 +43,7 @@ class CollectFragment :
     }
 
     override fun showResult(result: String) {
-        ToastUtils.showToast(CollectFragment@ this.requireActivity(), result)
+        this.activity?.toast(result)
     }
 
     override fun initViews() {
