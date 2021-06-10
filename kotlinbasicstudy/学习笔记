@@ -83,29 +83,22 @@ var method3={number1:Int,number2:Int-> number1+number2}
 >    out 说明该类的泛型只能获取  相当于输出，就是只读的
 >    不使用in out 说明该类的泛型既可以输入，也可以输出
 
+
+
+
+#### 5、kotlin 协程  使用
+
+什么是协程，协程是用来干什么的？
+
+
+1、引入协程的包
+ 
 ```
-class fuclass{
-}
+    api 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.3.2'
+     api 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.2'
 
-class ziclass:fuclass(){
-}
-
-fun main(){
-    var list:MutableList<out fuclass>=ArrayList<ziclass>()
-
-}
-
-
-class AAA<in T>{
-
-    fun setData(data:T){
-}
-}
 ```
-
-
-
-#### 5、kotlin 协程
+     
 
 
 
