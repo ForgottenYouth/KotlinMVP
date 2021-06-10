@@ -1,0 +1,116 @@
+###Kotlin 学习笔记
+
+####1、java与Kotlin互相调用
+  >>1.1  kotlin调用java时，需要做非空的判断处理，这样避免出现空指针异常
+  >>1.2  kotlin调用java的接口，可以使用(object : javaCallback )进行实例化后实现接口的方法
+                            可以直接使用（{这里显示接口方法的函数体}）
+                            直接创建接口的的实例，并实现接口
+  >>1.3 java调用kotlin的方法，可以通过文件的名.方法名来进行调用，但是如果不想让java调用，可以使用双单引号将方法名字包含起来就无法调用了
+```
+fun 'show'(){
+    //此方法无法被java调用
+}
+```
+
+   >>1.4 kotlin中的扩展函数
+```
+class student{
+}
+
+//此时为student添加了一个扩展函数
+fun student.add(var number:Int,var number2:Int){
+}
+
+fun main():Int{
+student.add(1,2);
+}
+```
+>>1.5 kotlin 高阶函数：将函数作为参数传递给主函数，该主函数称为高阶函数
+```
+loginmethod 是函数名
+:() 括号里面可以加入函数名的参数
+->Unit 为函数的返回值
+
+    fun show(isLogin:Boolean,loginmethod:()->Unit){
+    }
+
+
+fun main(){
+    show(true){
+        此括号里面的内容就是高阶函数loginmethod的函数体
+    }
+}
+```
+>> 1.6 kotlin中的单例，如果不需要传入参数时，尽量使用object 来实现单例;
+>                     如果需要参数时，object 无法做到，只能使用companion 来实现单例；
+
+
+#### 2、MVC ----MVP----MVVM 
+>     MVC是非常经典的架构模型，但是在android平台，Activity充当的这个C层需要干的事情太多了，职责区分不是那么的明显，导致在
+>     Activity里面会出现非常多的代码，维护越来越困难。违背了单一职责原则，所以就出现了MVP架构模型。
+
+>     MVP 模型主要是将Activity 分离出来，让Activity只做和View层相关的事情，更多的事情让P层去完成（校验等），
+         V层调用P层  P层再调用M层 ;  P层通过回调的方式，将处理的结果返回给View层进行显示;
+         M层与V层彼此互不关心，共同关心P层;
+>        优点：分层清晰，自由拆卸
+>       M层  负责处理数据源
+>       P层负责M与V层的数据交互
+>       V层负责数据展示，用户交互
+        
+         
+     
+#### 3、kotlin中的lambda
+```
+//() 参数为空，返回值：Unit   函数名method ， 该函数不能调用，因为没有函数体
+var method:()->Unit
+
+
+//有函数体，可以调用
+var method:(Int ,Int)->Int={number1+number2=number1+number2}
+method(9,9)
+
+var method3={number1:Int,number2:Int-> number1+number2}
+```
+
+>
+>
+#### 4、kotlin泛型
+> 1) java中泛型的通配符是?   而Kotlin泛型的通配符是 *
+> 2) kotlin 中的out  相当于java是 extends  只读   输出
+>               in   相当于java是 super    只写   输入
+> 3) in out 在类的声明泛型时作用：可以控制整个类泛型读写模式,  而java中不能在泛型声明的时候限定泛型的读写模式
+>    in 说明该类的泛型只能写     相当于输入，就是只写的
+>    out 说明该类的泛型只能获取  相当于输出，就是只读的
+>    不使用in out 说明该类的泛型既可以输入，也可以输出
+
+```
+class fuclass{
+}
+
+class ziclass:fuclass(){
+}
+
+fun main(){
+    var list:MutableList<out fuclass>=ArrayList<ziclass>()
+
+}
+
+
+class AAA<in T>{
+
+    fun setData(data:T){
+}
+}
+```
+
+
+
+#### 5、kotlin 协程
+
+
+
+>学习进度
+>
+>java筑基/高级UI   2:10
+>Kotlin项目实操之首页模块
+ 2020-06-30 周二 20:00-22:00

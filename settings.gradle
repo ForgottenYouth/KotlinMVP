@@ -1,0 +1,9 @@
+include ':kotlinbasicstudy'
+include ':main'
+include ':login'
+include ':base'
+include ':common'
+include ':app'
+rootProject.name = "KotlinMVP"
+
+//34
