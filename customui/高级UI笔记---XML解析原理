@@ -1,0 +1,507 @@
+#布局原理与xml解析原理分析
+
+从源码分析
+
+#######第一部分：加载layout 布局文件的逻辑：
+###（1）初始化窗口及根布局：
+    >1.1)从activity加载布局文件的过程分析，并来收集每一个view的属性名和value
+    ActivityThread 类中的performLaunchActivity()方法来启动activity
+    首先：创建Activity
+
+                ```
+                ContextImpl appContext = createBaseContextForActivity(r);
+                        Activity activity = null;
+                        java.lang.ClassLoader cl = appContext.getClassLoader();
+                                    activity = mInstrumentation.newActivity(
+                                                   cl, component.getClassName(), r.intent);
+                ```
+    >1.2)然后调用activity的attach()方法
+                ```
+                 activity.attach(appContext, this, getInstrumentation(), r.token,
+                                              r.ident, app, r.intent, r.activityInfo, title, r.parent,
+                                              r.embeddedID, r.lastNonConfigurationInstances, config,
+                                              r.referrer, r.voiceInteractor, window, r.configCallback,
+                                              r.assistToken);
+                ```
+    >1.3)进入Activity 类 找到attach()方法  他会创建一个phoneWindow的对象
+                ```
+                 mWindow = new PhoneWindow(this, window, activityConfigCallback);
+                ```
+    >1.4)创建后phoneWindow后，我们来看activity的setContentView()方法：
+                ```
+                  public void setContentView(@LayoutRes int layoutResID) {
+                              getWindow().setContentView(layoutResID);
+                              initWindowDecorActionBar();
+                          }
+                ```
+    >1.5)这里就是调用的上一步创建好的phoneWindow的setContentView()方法，那我们就进去看看：
+
+                 ```
+                public void setContentView(int layoutResID) {
+                                            if (mContentParent == null) {
+                                                      installDecor();
+                                                  } else if (!hasFeature(FEATURE_CONTENT_TRANSITIONS)) {
+                                                      mContentParent.removeAllViews();
+                                                  }
+                                                  if (hasFeature(FEATURE_CONTENT_TRANSITIONS)) {
+                                                      final Scene newScene = Scene.getSceneForLayout(mContentParent, layoutResID,
+                                                              getContext());
+                                                      transitionTo(newScene);
+                                                  } else {
+                                                      mLayoutInflater.inflate(layoutResID, mContentParent);
+                                                  }
+                                              }
+                ```
+
+    >1.6)继续进入到：installDecor(); 先生成一个   DecorView mDecor;而这个DecorView 其实就是一个FrameLayout
+                ```
+                 mDecor = generateDecor(-1);
+                 //然后将这个mDecor作为根传递到generateLayout方法中，
+                 ViewGroup mContentParent = generateLayout(mDecor);
+                ```
+    >1.7)这里会生成一个布局进入：generateLayout(mDecor);然后找到系统资源文件中的布局id,并生成根视图返回
+                ```
+                ViewGroup contentParent = (ViewGroup)findViewById(ID_ANDROID_CONTENT);
+                ```
+
+###（2）第一步我们找到了mContentParent的创建的地方后，我们继续回到PhoneWindow类的setContentView()中，沿着代码往下走：
+    >2.1)  mLayoutInflater.inflate(layoutResID, mContentParent);//这里把我们上一步创建好的mContentParent传递进去，
+    >      而layoutResID 就是我们在自己的activity中的布局文件ID
+    >     一直跟踪下去，会进入到LayoutInflater类
+    >最后一个参数attachToRoot的作用，
+    >true代码动态加载
+    >false 代表将我们自己的根布局的参数添加的DecorView中去 
+                ```
+                public View inflate(XmlPullParser parser, @Nullable ViewGroup root, boolean attachToRoot) {
+                // Temp is the root view that was found in the xml
+                 final View temp = createViewFromTag(root, name, inflaterContext, attrs);
+                        // Create layout params that match root, if supplied
+                      params = root.generateLayoutParams(attrs);
+                      
+                      if (!attachToRoot) {
+                             // Set the layout params for temp if we are not
+                             // attaching. (If we are, we use addView, below)
+                            temp.setLayoutParams(params);
+                      }
+                }
+                ```
+
+   
+    >2.2)继续进createViewFromTag()方法中去：
+                ```
+                            View view = tryCreateView(parent, name, context, attrs);
+                            if (view == null) {
+                                final Object lastContext = mConstructorArgs[0];
+                                mConstructorArgs[0] = context;
+                                try {
+                                    if (-1 == name.indexOf('.')) {
+                                        view = onCreateView(context, parent, name, attrs);
+                                    } else {
+                                        view = createView(context, name, null, attrs);
+                                    }
+                                } finally {
+                                    mConstructorArgs[0] = lastContext;
+                                }
+                            }
+                ```
+    >
+
+
+    >2.3) 我们先进入tryCreateView()方法看看
+                ```
+                public final View tryCreateView(@Nullable View parent, @NonNull String name,
+                         @NonNull Context context,
+                         @NonNull AttributeSet attrs) {
+                         if (name.equals(TAG_1995)) {
+                             // Let's party like it's 1995!
+                             return new BlinkLayout(context, attrs);
+                         }
+                 
+                         View view;
+                         if (mFactory2 != null) {
+                             view = mFactory2.onCreateView(parent, name, context, attrs);
+                         } else if (mFactory != null) {
+                             view = mFactory.onCreateView(name, context, attrs);
+                         } else {
+                             view = null;
+                         }
+                 
+                         if (view == null && mPrivateFactory != null) {
+                             view = mPrivateFactory.onCreateView(parent, name, context, attrs);
+                         }
+                 
+                         return view;
+                     }
+                ```
+**在中间View的创建是通过Factory工程模式来进行创建的，而Factory是给我们定义的一个接口，
+由此可见我们也可以来通过自定义这个Factory的方式来实现工厂的onCreatView()方法
+方法中抄袭系统的createView()的实现来完成视图View的创建。**
+
+    >2.4) View的创建都是通过调用LayoutInflater.java中的creatView（）方法来完成的。
+         >通过上述createView我们可以发现，自定义的view是通过反射来进行加载的，最后将通过反射创建出一个view的实例并返回回去
+                ```
+                public final View createView(@NonNull Context viewContext, @NonNull String name,
+                                  @Nullable String prefix, @Nullable AttributeSet attrs)
+                                  throws ClassNotFoundException, InflateException {
+                              Objects.requireNonNull(viewContext);
+                              Objects.requireNonNull(name);
+                              Constructor<? extends View> constructor = sConstructorMap.get(name);
+                              if (constructor != null && !verifyClassLoader(constructor)) {
+                                  constructor = null;
+                                  sConstructorMap.remove(name);
+                              }
+                              Class<? extends View> clazz = null;
+                      
+                              try {
+                                  Trace.traceBegin(Trace.TRACE_TAG_VIEW, name);
+                      
+                                  if (constructor == null) {
+                                      // Class not found in the cache, see if it's real, and try to add it
+                                      clazz = Class.forName(prefix != null ? (prefix + name) : name, false,
+                                              mContext.getClassLoader()).asSubclass(View.class);
+                      
+                                      if (mFilter != null && clazz != null) {
+                                          boolean allowed = mFilter.onLoadClass(clazz);
+                                          if (!allowed) {
+                                              failNotAllowed(name, prefix, viewContext, attrs);
+                                          }
+                                      }
+                                      constructor = clazz.getConstructor(mConstructorSignature);//此处可以说明所有的自定义都会调用两个参数的构造函数
+                                      constructor.setAccessible(true);
+                                      sConstructorMap.put(name, constructor);
+                                  } else {
+                                      // If we have a filter, apply it to cached constructor
+                                      if (mFilter != null) {
+                                          // Have we seen this name before?
+                                          Boolean allowedState = mFilterMap.get(name);
+                                          if (allowedState == null) {
+                                              // New class -- remember whether it is allowed
+                                              clazz = Class.forName(prefix != null ? (prefix + name) : name, false,
+                                                      mContext.getClassLoader()).asSubclass(View.class);
+                      
+                                              boolean allowed = clazz != null && mFilter.onLoadClass(clazz);
+                                              mFilterMap.put(name, allowed);
+                                              if (!allowed) {
+                                                  failNotAllowed(name, prefix, viewContext, attrs);
+                                              }
+                                          } else if (allowedState.equals(Boolean.FALSE)) {
+                                              failNotAllowed(name, prefix, viewContext, attrs);
+                                          }
+                                      }
+                                  }
+                      
+                                  Object lastContext = mConstructorArgs[0];
+                                  mConstructorArgs[0] = viewContext;
+                                  Object[] args = mConstructorArgs;
+                                  args[1] = attrs;
+                      
+                                  try {
+                                        //此处就创建好了我们自己定义的layoutView
+                                      final View view = constructor.newInstance(args);
+                                      if (view instanceof ViewStub) {
+                                          // Use the same context when inflating ViewStub later.
+                                          final ViewStub viewStub = (ViewStub) view;
+                                          viewStub.setLayoutInflater(cloneInContext((Context) args[0]));
+                                      }
+                                      return view;
+                                  } finally {
+                                      mConstructorArgs[0] = lastContext;
+                                  }
+                              } finally {
+                                  Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+                              }
+                          }
+                ```
+ 
+ ###（3）资源的加载过程(ActivityThread.java 中的handleBindApplication(AppBindData data)方法中开始)
+    >3.1)  创建一个仪表类
+                ```
+                        mInstrumentation = new Instrumentation();
+                ```
+    >3.2) 创建application
+                ```
+                 app = data.info.makeApplication(data.restrictedBackupMode, null);
+                ```  
+                进入makeApplication()中，LoadedApk.java中的makeApplication方法中去，进行上下文创建：
+                ```
+                 ContextImpl appContext = ContextImpl.createAppContext(mActivityThread, this);
+                 
+                 //创建上下文的方法
+                    static ContextImpl createAppContext(ActivityThread mainThread, LoadedApk packageInfo,
+                             String opPackageName) {
+                         if (packageInfo == null) throw new IllegalArgumentException("packageInfo");
+                         ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null, null, null, null,
+                                 0, null, opPackageName);
+                         context.setResources(packageInfo.getResources());
+                         context.mIsSystemOrSystemUiContext = isSystemOrSystemUI(context);
+                         return context;
+                     }
+                     //在创建上下文是需要配置context.setResources()设置资源信息，此时传入的packageInfo.getResources()
+                     //我们进去看看这个packageInfo.getResources()是什么东东
+                     
+                     
+                  public Resources getResources() {
+                         if (mResources == null) {
+                             final String[] splitPaths;
+                             try {
+                                 splitPaths = getSplitPaths(null);
+                             } catch (NameNotFoundException e) {
+                                 // This should never fail.
+                                 throw new AssertionError("null split not found");
+                             }
+                 
+                             mResources = ResourcesManager.getInstance().getResources(null, mResDir,
+                                     splitPaths, mOverlayDirs, mApplicationInfo.sharedLibraryFiles,
+                                     Display.DEFAULT_DISPLAY, null, getCompatibilityInfo(),
+                                     getClassLoader(), null);
+                         }
+                         return mResources;
+                     }
+                     
+                //接着进入 ResourcesManager.getInstance()的getResources()方法中去：     
+                public @Nullable Resources getResources() {
+                        try {
+                            Trace.traceBegin(Trace.TRACE_TAG_RESOURCES, "ResourcesManager#getResources");
+                            final ResourcesKey key = new ResourcesKey(
+                                    resDir,
+                                    splitResDirs,
+                                    overlayDirs,
+                                    libDirs,
+                                    displayId,
+                                    overrideConfig != null ? new Configuration(overrideConfig) : null, // Copy
+                                    compatInfo,
+                                    loaders == null ? null : loaders.toArray(new ResourcesLoader[0]));
+                            classLoader = classLoader != null ? classLoader : ClassLoader.getSystemClassLoader();
+                
+                            if (activityToken != null) {
+                                rebaseKeyForActivity(activityToken, key);
+                            }
+                
+                            return createResources(activityToken, key, classLoader);
+                        } finally {
+                            Trace.traceEnd(Trace.TRACE_TAG_RESOURCES);
+                        }
+                    }
+                    
+                  // 接着进入createResources(),然后再进入findOrCreateResourcesImplForKeyLocked中去
+                  private @Nullable Resources createResources(@Nullable IBinder activityToken,
+                             @NonNull ResourcesKey key, @NonNull ClassLoader classLoader) {
+                         synchronized (this) {
+                             if (DEBUG) {
+                                 Throwable here = new Throwable();
+                                 here.fillInStackTrace();
+                                 Slog.w(TAG, "!! Get resources for activity=" + activityToken + " key=" + key, here);
+                             }
+                 
+                             ResourcesImpl resourcesImpl = findOrCreateResourcesImplForKeyLocked(key);
+                             if (resourcesImpl == null) {
+                                 return null;
+                             }
+                 
+                             if (activityToken != null) {
+                                 return createResourcesForActivityLocked(activityToken, classLoader,
+                                         resourcesImpl, key.mCompatInfo);
+                             } else {
+                                 return createResourcesLocked(classLoader, resourcesImpl, key.mCompatInfo);
+                             }
+                         }
+                     }
+                  
+                   //接着看看ResourcesImpl的实现：
+                   private @Nullable ResourcesImpl createResourcesImpl();
+                   
+                           final AssetManager assets = createAssetManager(key);
+                           if (assets == null) {
+                               return null;
+                           }
+                   
+                           final DisplayMetrics dm = getDisplayMetrics(key.mDisplayId, daj);
+                           final Configuration config = generateConfig(key, dm);
+                           final ResourcesImpl impl = new ResourcesImpl(assets, dm, config, daj);
+                   
+                           if (DEBUG) {
+                               Slog.d(TAG, "- creating impl=" + impl + " with key: " + key);
+                           }
+                           return impl;
+                       }                   
+                    
+                    //进入createAssetManager()方法,创建好了AssetManager的对象后返回该对象，用于生成ResourcesImpl 构建对象，这样就可以得到我们apk包中的资源了
+                    protected @Nullable AssetManager createAssetManager(@NonNull final ResourcesKey key) {
+                            final AssetManager.Builder builder = new AssetManager.Builder();
+                    
+                            if (key.mResDir != null) {
+                                try {
+                                    builder.addApkAssets(loadApkAssets(key.mResDir, false /*sharedLib*/,
+                                            false /*overlay*/));
+                                } catch (IOException e) {
+                                    Log.e(TAG, "failed to add asset path " + key.mResDir);
+                                    return null;
+                                }
+                            }
+                    
+                            if (key.mSplitResDirs != null) {
+                                for (final String splitResDir : key.mSplitResDirs) {
+                                    try {
+                                        builder.addApkAssets(loadApkAssets(splitResDir, false /*sharedLib*/,
+                                                false /*overlay*/));
+                                    } catch (IOException e) {
+                                        Log.e(TAG, "failed to add split asset path " + splitResDir);
+                                        return null;
+                                    }
+                                }
+                            }
+                    
+                            if (key.mLibDirs != null) {
+                                for (final String libDir : key.mLibDirs) {
+                                    if (libDir.endsWith(".apk")) {
+                                        // Avoid opening files we know do not have resources,
+                                        // like code-only .jar files.
+                                        try {
+                                            builder.addApkAssets(loadApkAssets(libDir, true /*sharedLib*/,
+                                                    false /*overlay*/));
+                                        } catch (IOException e) {
+                                            Log.w(TAG, "Asset path '" + libDir +
+                                                    "' does not exist or contains no resources.");
+                    
+                                            // continue.
+                                        }
+                                    }
+                                }
+                            }
+                            return builder.build();
+                        }
+                        
+                  //到目前为止，我们已经找到了ResoucesImpl的实现
+                     
+                 ```
+                 
+  ###（4）接下来从我们自己的activity中获取资源看起走：
+  >4.1)resources.getDrawable()
+  
+  //进入getDrawable()都会调用到下面的代码中去
+            ```
+            public Drawable getDrawableForDensity(@DrawableRes int id, int density, @Nullable Theme theme) {
+                    final TypedValue value = obtainTempTypedValue();
+                    try {
+                        final ResourcesImpl impl = mResourcesImpl;
+                        impl.getValueForDensity(id, density, value, true);
+                        return loadDrawable(value, id, density, theme);
+                    } finally {
+                        releaseTempTypedValue(value);
+                    }
+                }
+            
+            ```
+     
+  >4.2)resources.getString()/resources.getText() 
+
+//进入getString()都会调用到下面的代码中去  
+ 
+             ```
+             @NonNull public CharSequence getText(@StringRes int id) throws NotFoundException {
+                        CharSequence res = mResourcesImpl.getAssets().getResourceText(id);
+                        if (res != null) {
+                            return res;
+                        }
+                        throw new NotFoundException("String resource ID #0x"
+                                + Integer.toHexString(id));
+                    }
+            ```
+    
+>4.3)resources.getColor()
+
+//进入getColor()都会调用到下面的代码中去  
+            ```
+            public int getColor(@ColorRes int id, @Nullable Theme theme) throws NotFoundException {
+                    final TypedValue value = obtainTempTypedValue();
+                    try {
+                        final ResourcesImpl impl = mResourcesImpl;
+                        impl.getValue(id, value, true);
+                        if (value.type >= TypedValue.TYPE_FIRST_INT
+                                && value.type <= TypedValue.TYPE_LAST_INT) {
+                            return value.data;
+                        } else if (value.type != TypedValue.TYPE_STRING) {
+                            throw new NotFoundException("Resource ID #0x" + Integer.toHexString(id)
+                                    + " type #0x" + Integer.toHexString(value.type) + " is not valid");
+                        }
+            
+                        final ColorStateList csl = impl.loadColorStateList(this, value, id, theme);
+                        return csl.getDefaultColor();
+                    } finally {
+                        releaseTempTypedValue(value);
+                    }
+                }
+            ```
+>4.4)resources.getAnimation()
+
+//进入getAnimation()会调入如下方法：
+            ```
+             XmlResourceParser loadXmlResourceParser(@AnyRes int id, @NonNull String type)
+                        throws NotFoundException {
+                    final TypedValue value = obtainTempTypedValue();
+                    try {
+                        final ResourcesImpl impl = mResourcesImpl;
+                        impl.getValue(id, value, true);
+                        if (value.type == TypedValue.TYPE_STRING) {
+                            return loadXmlResourceParser(value.string.toString(), id,
+                                    value.assetCookie, type);
+                        }
+                        throw new NotFoundException("Resource ID #0x" + Integer.toHexString(id)
+                                + " type #0x" + Integer.toHexString(value.type) + " is not valid");
+                    } finally {
+                        releaseTempTypedValue(value);
+                    }
+                }
+            ```
+
+>4.5)resources.getDimension()
+
+
+            ```
+             public float getDimension(@DimenRes int id) throws NotFoundException {
+                    final TypedValue value = obtainTempTypedValue();
+                    try {
+                        final ResourcesImpl impl = mResourcesImpl;
+                        impl.getValue(id, value, true);
+                        if (value.type == TypedValue.TYPE_DIMENSION) {
+                            return TypedValue.complexToDimension(value.data, impl.getDisplayMetrics());
+                        }
+                        throw new NotFoundException("Resource ID #0x" + Integer.toHexString(id)
+                                + " type #0x" + Integer.toHexString(value.type) + " is not valid");
+                    } finally {
+                        releaseTempTypedValue(value);
+                    }
+                }
+            ```
+
+    
+  //从上面的代码我们可以看到，所有资源的获取都会最终调用到AssetManager的getResourceValue()方法中去
+  
+   boolean getResourceValue(@AnyRes int resId, int densityDpi, @NonNull TypedValue outValue,
+              boolean resolveRefs) {
+          Objects.requireNonNull(outValue, "outValue");
+          synchronized (this) {
+              ensureValidLocked();
+              final int cookie = nativeGetResourceValue(
+                      mObject, resId, (short) densityDpi, outValue, resolveRefs);
+              if (cookie <= 0) {
+                  return false;
+              }
+ 
+              // Convert the changing configurations flags populated by native code.
+              outValue.changingConfigurations = ActivityInfo.activityInfoConfigNativeToJava(
+                      outValue.changingConfigurations);
+  
+              if (outValue.type == TypedValue.TYPE_STRING) {
+                  outValue.string = getPooledStringForCookie(cookie, outValue.data);
+              }
+              return true;
+          }
+      }   
+      
+      
+### 5) 完成上面的步骤后，接下来是回调回我们app的application的onCreate()方法中：
+```java
+ mInstrumentation.callApplicationOnCreate(app);
+```                         
+                                                                      

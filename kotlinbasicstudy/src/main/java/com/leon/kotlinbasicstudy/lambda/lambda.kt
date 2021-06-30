@@ -18,20 +18,20 @@ fun main(){
     // () -> Unit    空参函数  并且 没有返回值  函数名=method01
 
     // TODO 定义没有问题，调用不行
-    /*var method01 : () -> Unit
-    method01() // 不能调用  没有具体的实现
-
-    var method02 : (Int, Int) -> Int
-    method02(9, 9)
-
-    var method03: (String, Double) -> Any?
-    method03("Derry", 543354.4)
-
-    var method04 : (Int, Double, Long, String ? ) -> Boolean
-    method04(1, 545, 3543, null)
-
-    var method05 : (Int, Int) -> Int
-    method05(9, 9)*/
+//    var method01 : () -> Unit
+//    method01() // 不能调用  没有具体的实现
+//
+//    var method02 : (Int, Int) -> Int
+//    method02(9, 9)
+//
+//    var method03: (String, Double) -> Any?
+//    method03("Derry", 543354.4)
+//
+//    var method04 : (Int, Double, Long, String ? ) -> Boolean
+//    method04(1, 545, 3543, null)
+//
+//    var method05 : (Int, Int) -> Int
+//    method05(9, 9)
 
     // : (形参类型)
     // = {具体详情}

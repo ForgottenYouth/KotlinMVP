@@ -86,15 +86,10 @@ fun main() {
         println("let 参数it的值是${it}")
     }
 
-    Leon.apply {
+    var temp = Leon.apply {
         println("apply 回传的this的值是$this")
     }
-
-    fun <T> T.apply(block: T.() -> Unit): T {
-        block()
-        return this
-    }
-
+    println("apply 执行后的结果$temp")
 
     repeat(Leon.length) {
         println("repeat轮询：it=${it},leon的当前位置的字符是：${Leon[it]}")

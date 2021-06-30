@@ -10,7 +10,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.KotlinRetrofitDemo">
-        <activity android:name="com.leon.login.LoginActivity">
+        <activity android:name="com.leon.customui.activity.CustomUIMainActivity">
             <intent-filter>
                 <category android:name="android.intent.category.LAUNCHER" />
                 <action android:name="android.intent.action.MAIN" />

@@ -411,6 +411,6 @@ val value = 12
 
 /**
  * TODO 概述
- * 由于google与sun公司的种种原因，现在google已经将Kotlin列为第一语言，kotlin是一种可以与android兼容的语言，他不仅语法简介，更具表达性，还具备类型安全和空值安全的特性。
+ * 现在google已经将Kotlin列为第一语言，kotlin是一种可以与android兼容的语言，他不仅语法简介，更具表达性，还具备类型安全和空值安全的特性。
  * 可以与java无缝互通。
  */

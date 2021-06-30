@@ -1,3 +1,5 @@
+include ':jetpack'
+include ':customui'
 include ':kotlinbasicstudy'
 include ':main'
 include ':login'
