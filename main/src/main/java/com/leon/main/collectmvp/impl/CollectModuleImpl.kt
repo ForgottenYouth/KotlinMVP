@@ -43,8 +43,10 @@ class CollectModuleImpl : ICollectModule {
     }
 
     override fun queryAll(listener: IMVPBasePresenter.ModuleListener<List<Student>, String>) {
-        var result: List<Student> = LocalDataBaseManager.getInstance()?.queryAll() as List<Student>
-        listener.onModuleSuccessCallBack(result)
+        var result: List<Student>? = LocalDataBaseManager.getInstance()?.queryAll() as? List<Student>
+        if (result != null) {
+            listener.onModuleSuccessCallBack(result)
+        }
     }
 
     override fun cancelRequest() {

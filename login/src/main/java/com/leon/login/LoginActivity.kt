@@ -61,7 +61,7 @@ class LoginActivity :
 //            binding.userPhoneEt.text.toString(),
 //            user_password_et.text.toString()
 //        )
-        ARouter.getInstance().build(RoutePath.REGIST).navigation()
+        ARouter.getInstance().build(RoutePath.MAIN).navigation()
     }
 
     override fun loginSuccess(result: LoginResponse?) {

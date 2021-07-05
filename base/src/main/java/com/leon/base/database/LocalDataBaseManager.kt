@@ -12,9 +12,8 @@ class LocalDataBaseManager : IDataBaseRequest {
     /**
      * TODO 构造代码块
      */
-    init {
-        val studentDataBase: StudentDataBase? = StudentDataBase.getDataBase()
-        studentDao = studentDataBase?.getStudentDao()
+    constructor(){
+        studentDao = StudentDataBase.getDataBase()?.getStudentDao()
     }
 
     companion object {

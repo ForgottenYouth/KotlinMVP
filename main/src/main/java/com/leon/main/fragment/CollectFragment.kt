@@ -16,6 +16,7 @@ import com.leon.main.collectmvp.inter.ICollectView
 import com.leon.base.database.Student
 import com.leon.common.utils.toast
 import com.leon.main.databinding.FragmentCollectLayoutBinding
+import com.leon.skinlib.SkinManager
 import kotlinx.android.synthetic.main.fragment_collect_layout.*
 
 class CollectFragment :
@@ -54,7 +55,8 @@ class CollectFragment :
             }
 
             clearData.setOnClickListener {
-                presenter?.deleteAll()
+//                presenter?.deleteAll()
+                SkinManager.getInstance().loadSkin("/data/data/com.leon.kotlinretrofitdemo/goldskinapk-debug.apk")
             }
         }
     }

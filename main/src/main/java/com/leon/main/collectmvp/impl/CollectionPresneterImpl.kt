@@ -22,6 +22,7 @@ class CollectionPresneterImpl(view: ICollectView?) :
         module.insert(object : ModuleListener<String, String> {
             override fun onModuleSuccessCallBack(result: String) {
                 view?.showResult(result)
+                queryAll()
             }
 
             override fun onModuleFailureCallBack(result: String) {
