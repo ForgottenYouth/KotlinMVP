@@ -7,6 +7,7 @@
 package com.leon.customui.activity
 
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.alibaba.android.arouter.facade.annotation.Route
 import com.leon.base.config.RoutePath
@@ -17,6 +18,8 @@ class CustomUIMainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.customui_main)
+        setContentView(R.layout.activity_customui_main)
     }
+
+    fun onclick(view: View) {}
 }

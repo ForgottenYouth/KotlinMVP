@@ -1,3 +1,5 @@
+include ':goldskinapk'
+include ':skinlib'
 include ':jetpack'
 include ':customui'
 include ':kotlinbasicstudy'
