@@ -19,7 +19,7 @@ class SkinThemeUtils {
     companion object {
 
         private val APPCOMPAT_COLOR_PRIMARY_DARK_ATTRS = intArrayOf(
-//            android.support.v7.appcompat.R.attr.colorPrimaryDark
+            androidx.appcompat.R.attr.colorPrimaryDark
         )
         private val STATUSBAR_COLOR_ATTRS = intArrayOf(
             R.attr.statusBarColor, R.attr.navigationBarColor

@@ -10,6 +10,7 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import android.util.ArrayMap
+import android.view.LayoutInflater
 import androidx.core.view.LayoutInflaterCompat
 import com.leon.skinlib.utils.SkinThemeUtils
 import java.lang.reflect.Field
@@ -45,8 +46,8 @@ class ApplicationLifeCycle : Application.ActivityLifecycleCallbacks {
 
             var methods = LayoutInflaterCompat::class.java.declaredMethods
             var method = methods.find { it.name == "forceSetFactory2" }
-            method?.isAccessible=true
-            method?.invoke(LayoutInflaterCompat::class, layoutInflater, skinLayoutInflaterFactory)
+            method?.isAccessible = true
+            method?.invoke(LayoutInflaterCompat::class, layoutInflater,skinLayoutInflaterFactory)
             mLayoutInflaterFactories.put(activity, skinLayoutInflaterFactory)
             mObserable?.addObserver(skinLayoutInflaterFactory)
         } catch (e: Exception) {

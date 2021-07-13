@@ -39,7 +39,6 @@ android {
 
 dependencies {
     api project(":common")
-    api  'com.alibaba:arouter-api:1.5.1'
+    implementation  'com.alibaba:arouter-api:1.5.1'
     kapt 'com.alibaba:arouter-compiler:1.2.2'
-    api 'com.android.support:appcompat-v7:27.0.0'
 }

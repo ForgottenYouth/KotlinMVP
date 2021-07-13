@@ -12,9 +12,24 @@
         android:orientation="vertical">
 
         <Button
+            android:id="@+id/flow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="goto flow"
+            android:text="Flow"
+            android:onClick="onclick"/>
+
+        <Button
+            android:id="@+id/nestedscroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="NestedScrollLayout"
+            android:onClick="onclick"/>
+
+        <Button
+            android:id="@+id/skin"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SKIN"
             android:onClick="onclick"/>
 
     </LinearLayout>

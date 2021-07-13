@@ -40,7 +40,7 @@ class BaseApplication : Application() {
         StudentDataBase.getDataBase(this)
 
         //初始化皮肤管理器
-        SkinManager.init(this)
+//        SkinManager.init(this)
     }
 
     override fun onTerminate() {

@@ -37,7 +37,7 @@ class SkinAttribute {
         var mSkinPair = ArrayList<SkinPair>()
         var i = 0
         while (i < attrs.attributeCount) {
-            val attributeName = attrs.getAttributeName(i)
+            val attributeName = attrs.getAttributeName(i) ?: continue
             if (mAttributes.contains(attributeName)) {
                 val attributeValue = attrs.getAttributeValue(i)
                 if (attributeValue.startsWith("#")) {

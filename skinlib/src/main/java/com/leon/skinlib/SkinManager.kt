@@ -44,6 +44,7 @@ class SkinManager : Observable {
 
             val packageManager = mContext?.packageManager
             if (skinPath != null) {
+                //获取皮肤包的包名
                 val packageArchiveInfo =
                     packageManager?.getPackageArchiveInfo(skinPath, PackageManager.GET_ACTIVITIES)
 

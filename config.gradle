@@ -3,7 +3,7 @@ ext{
             applicationId  : "com.leon.kotlinretrofitdemo",
             compileSdkVersion: 30,
             buildToolsVersion: "30.0.3",
-            minSdkVersion    : 24,
+            minSdkVersion    : 26,
             targetSdkVersion : 30,
             versionCode      : 1,
             versionName      : "1.0.20200521.01"

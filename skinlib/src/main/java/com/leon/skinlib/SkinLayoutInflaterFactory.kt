@@ -65,7 +65,7 @@ class SkinLayoutInflaterFactory : LayoutInflater.Factory2, Observer {
     }
 
     private fun createView(name: String, context: Context, attrs: AttributeSet): View? {
-        var constructor: Constructor<out View?>? = sConstructorMap.get(attr.name)
+        var constructor: Constructor<out View?>? = sConstructorMap.get(name)
 
         try {
             if (null == constructor) {
