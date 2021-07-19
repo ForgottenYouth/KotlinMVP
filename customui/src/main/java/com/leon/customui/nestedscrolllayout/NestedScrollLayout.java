@@ -112,6 +112,9 @@ public class NestedScrollLayout extends NestedScrollView {
         }
     }
 
+    /**
+     * TODO 当加载完xml布局文件后回调此函数，这样可以获取到对应的子view
+     */
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();

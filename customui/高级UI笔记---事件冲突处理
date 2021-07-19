@@ -1,0 +1,646 @@
+
+事件冲突原因与解决方案大解密
+2020-07-12 周日 20:00-22:00
+
+# Android高级UI---事件冲突与解决方案
+
+前面了解了view的事件分发，这里我们继续研究一下view的事件分发和处理，从而找到事件冲突的原因及其解决方案。
+
+
+
+## 一、概念认知
+
+#### 		1）事件类型：
+
+​	在view的onTouchEvent(方法中)处理MotionEvent()的事件有：
+
+​			DOWN:  手指触摸屏幕的事件
+
+​			UP:	手指离开屏幕是的事件
+
+​			MOVE:	手指在屏幕上移动时的事件
+
+​			CANCEL:	当事件被拦截的时候就会触发
+
+
+
+#### 		2）事件分发的类与方法
+
+​		从源码角度来分析，事件分发的流程：
+
+​				activity--->dispatchTouchEvent()
+
+​				PhoneWindow --->superDispatchTouchEvent()
+
+​				DecorView --->superDispatchTouchEvent()
+
+​				ViewGroup--->dispatchTouchEvent()
+
+​				view--->dispatchTouchEvent()
+
+​				view--->onTouchEvent()
+
+
+
+#### 		3）事件冲突：
+
+​			只有一个事件，但处理的对象有多个，而真正处理的对象并不是期待的对象，这样就发生了冲突；
+
+  也就是说，一个事件可以由多个view处理时会出现事件冲突（如滚动嵌套），而一个view对一个事件有多个处理方式时也会出现冲突（如touch 和click 事件）。
+
+​			
+
+
+
+## 二、事件分发的流程
+
+
+
+在学习事件分发之前，有些状态或标记是通过位运算符来运算的，所以下面先简单了解一下位运算符：
+
+```ABAP
+&  比较位的值都是1的时候，该位的结果才是1 
+|  比较的位只要有一位是1 ，该位的结果就是1 
+~  将当前位进行0 1 的交换，即0 换成1 ，1 换成0 
+```
+
+
+
+### 2.1)、DOWN 事件的处理与分发流程：
+
+​		ViewGroup.java中dispatchTouchEvent(MotionEvent ev) 的源码中
+
+#### 2.1.1）重置mGroupFlags 
+
+​		执行的结果 mGroupFlags &= mGroupFlags & (~FLAG_DISALLOW_INTERCEPT);
+
+```java
+ if (actionMasked == MotionEvent.ACTION_DOWN) {
+                // Throw away all previous state when starting a new touch gesture.
+                // The framework may have dropped the up or cancel event for the previous gesture
+                // due to an app switch, ANR, or some other state change.
+                cancelAndClearTouchTargets(ev);
+                resetTouchState();
+            }
+
+//会重置mGroupFlags &= ~FLAG_DISALLOW_INTERCEPT;
+```
+
+
+
+#### 2.1.2）事件是否拦截
+
+​		用上一步重置的mGroupFlags的值替换下面的表达式：
+
+​				final boolean disallowIntercept = (mGroupFlags & FLAG_DISALLOW_INTERCEPT) != 0;
+
+​		替换后的结果是：
+
+​			final boolean disallowIntercept = ( mGroupFlags & (~FLAG_DISALLOW_INTERCEPT)& FLAG_DISALLOW_INTERCEPT) != 0;
+
+​			由此可以判断disallowIntercept 为false; 就会调用 onInterceptTouchEvent(ev) 来判断是否被拦截，这个方法可在自定义view中被重写的。
+
+```java
+ if (actionMasked == MotionEvent.ACTION_DOWN
+                    || mFirstTouchTarget != null) {
+                final boolean disallowIntercept = (mGroupFlags & FLAG_DISALLOW_INTERCEPT) != 0;
+                if (!disallowIntercept) {
+                    intercepted = onInterceptTouchEvent(ev);
+                    ev.setAction(action); // restore action in case it was changed
+                } else {
+                    intercepted = false;
+                }
+            } else {
+                // There are no touch targets and this action is not an initial down
+                // so this view group continues to intercept touches.
+                intercepted = true;
+            }
+```
+
+
+
+#### 2.1.3）事件处理与分发
+
+**1) 当被拦截的时候，即 onInterceptTouchEvent(ev)方法返回为true**
+
+​	A)  直接跳过下面的 if (!canceled && !intercepted)条件 ；
+
+由于首次事件处理，那么mFirstTouchTarget==null成立，然后就进入if (mFirstTouchTarget == null) 里面执行，这时候就会进入到dispatchTransformedTouchEvent(ev, canceled, null,TouchTarget.ALL_POINTER_IDS);
+
+> 注意：第二个参数canceled 是false ,第三个参数是null
+
+```java
+if (!canceled && !intercepted) {
+    //此处忽略
+ }
+
+// Dispatch to touch targets.
+if (mFirstTouchTarget == null) {
+       // No touch targets so treat this as an ordinary view.
+       handled = dispatchTransformedTouchEvent(ev, canceled, null,
+                        TouchTarget.ALL_POINTER_IDS);
+       } else {
+          //此处忽略
+       }
+}
+```
+
+
+
+​	B) 进入dispatchTransformedTouchEvent()方法:
+
+```java
+ private boolean dispatchTransformedTouchEvent(MotionEvent event, boolean cancel,
+            View child, int desiredPointerIdBits) {
+        final boolean handled;
+        
+        final int oldAction = event.getAction();
+        if (cancel || oldAction == MotionEvent.ACTION_CANCEL) {
+           //此处条件不成立，暂时忽略
+        }
+        
+        // Perform any necessary transformations and dispatch.
+        if (child == null) {
+            handled = super.dispatchTouchEvent(transformedEvent);
+        } else {
+           //此处条件不成立，暂时忽略
+        }
+
+        // Done.
+        transformedEvent.recycle();
+        return handled;    
+ }
+```
+
+> 说明：
+>
+> 由于传入的第三个参数是null ,就会直接进入该方法的最底部，调用super.dispatchTouchEvent(transformedEvent); 而当前viewGroup的super是view；这样就很显然调用了view的dispatchTouchEvent()方法.
+
+
+
+​	C) dispatchTouchEvent()方法
+
+> 说明：
+>
+> ​	1、设置了OnTouchListener监听者，会回调到监听者的onTouch() 方法中处理，
+>
+> ​				onTouch()方法返回true ,表示当前view已经消费了该事件，
+>
+> ​				onTouch()方法返回false, 则会进入view的onTouchEvent()中
+>
+> ​	2、没有设置OnTouchListener监听者，则会进入view的onTouchEvent()中
+
+```java
+public boolean dispatchTouchEvent(MotionEvent event) {
+      
+        boolean result = false;
+        if (onFilterTouchEventForSecurity(event)) {
+            if ((mViewFlags & ENABLED_MASK) == ENABLED && handleScrollBarDragging(event)) {
+                result = true;
+            }
+            //noinspection SimplifiableIfStatement
+            ListenerInfo li = mListenerInfo;
+            if (li != null && li.mOnTouchListener != null
+                    && (mViewFlags & ENABLED_MASK) == ENABLED
+                    && li.mOnTouchListener.onTouch(this, event)) {
+                result = true;
+            }
+
+            if (!result && onTouchEvent(event)) {
+                result = true;
+            }
+        }
+        return result;
+    }
+```
+
+​	D) View.java 的onTouchEvent()，该方法是真正的事件处理的地方，下面只取了down事件的处理
+
+```java
+//onTouchEvent()
+public boolean onTouchEvent(MotionEvent event) {
+        //此时是点击事件，所有下面的clickable是true
+        final boolean clickable = ((viewFlags & CLICKABLE) == CLICKABLE
+                || (viewFlags & LONG_CLICKABLE) == LONG_CLICKABLE)
+                || (viewFlags & CONTEXT_CLICKABLE) == CONTEXT_CLICKABLE;
+
+
+        if (clickable || (viewFlags & TOOLTIP) == TOOLTIP) {
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                 
+                    // Walk up the hierarchy to determine if we're inside a scrolling container.
+                    boolean isInScrollingContainer = isInScrollingContainer();
+
+                    // For views inside a scrolling container, delay the pressed feedback for
+                    // a short period in case this is a scroll.
+                    if (isInScrollingContainer) {
+                       //此处处理的是带滚动的容器中的down事件
+                    } else {
+                        // Not inside a scrolling container, so show the feedback right away
+                        setPressed(true, x, y);
+                        checkForLongClick(
+                                ViewConfiguration.getLongPressTimeout(),
+                                x,
+                                y,
+                                TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
+                    }
+                    break;
+            }
+            //此处返回的是true ,表示已经消费了该down事件
+            return true;
+        }
+        return false;
+    }
+```
+
+
+
+**2) 当未被拦截的时候：即 onInterceptTouchEvent(ev)方法返回为false**
+
+A) 没有被拦截时，上面拦截状态下跳过的if条件就会执行
+
+> 说明：
+>
+> 1、mChildrenCount 是指当前viewgroup的直接childview的数量，不包括childview的childview
+>
+> 2、在循环遍历childView的时候，if (dispatchTransformedTouchEvent(ev, false, child, idBitsToAssign))这个条件中再次给childview进行事件分发；
+>
+> ​	此处的第二个参数是false ,第三个参数child不为null ,这一步和down事件传入的不同
+>
+> 3、当第2点中if语句成立，也就是有child处理了事件的时候，将该处理事件的view加入到addTouchTarget(child, idBitsToAssign);事件视图链表中（**这一点的巧妙之处在于，当move ，up事件发生时，就不用再次查找，直接从该链表中找即**可）
+
+```java
+if (!canceled && !intercepted) {    
+    if (actionMasked == MotionEvent.ACTION_DOWN || (split && actionMasked == MotionEvent.ACTION_POINTER_DOWN)
+                        || actionMasked == MotionEvent.ACTION_HOVER_MOVE) {
+                
+       final int childrenCount = mChildrenCount;
+          if (newTouchTarget == null && childrenCount != 0) {
+               final ArrayList<View> preorderedList = buildTouchDispatchChildList();
+               final boolean customOrder = preorderedList == null && isChildrenDrawingOrderEnabled();
+               final View[] children = mChildren;
+               for (int i = childrenCount - 1; i >= 0; i--) {
+                   final int childIndex = getAndVerifyPreorderedIndex(
+                                    childrenCount, i, customOrder);
+                            final View child = getAndVerifyPreorderedView(
+                                    preorderedList, children, childIndex);
+                            if (dispatchTransformedTouchEvent(ev, false, child, idBitsToAssign)) {
+                                // Child wants to receive touch within its bounds.
+                                mLastTouchDownTime = ev.getDownTime();
+                                if (preorderedList != null) {
+                                    // childIndex points into presorted list, find original index
+                                    for (int j = 0; j < childrenCount; j++) {
+                                        if (children[childIndex] == mChildren[j]) {
+                                            mLastTouchDownIndex = j;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    mLastTouchDownIndex = childIndex;
+                                }
+                                mLastTouchDownX = ev.getX();
+                                mLastTouchDownY = ev.getY();
+                                newTouchTarget = addTouchTarget(child, idBitsToAssign);
+                                alreadyDispatchedToNewTouchTarget = true;
+                                break;
+                            }
+
+                            // The accessibility focus didn't handle the event, so clear
+                            // the flag and do a normal dispatch to all children.
+                            ev.setTargetAccessibilityFocus(false);
+                        }
+                        if (preorderedList != null) preorderedList.clear();
+                    }
+
+                    if (newTouchTarget == null && mFirstTouchTarget != null) {
+                        // Did not find a child to receive the event.
+                        // Assign the pointer to the least recently added target.
+                        newTouchTarget = mFirstTouchTarget;
+                        while (newTouchTarget.next != null) {
+                            newTouchTarget = newTouchTarget.next;
+                        }
+                        newTouchTarget.pointerIdBits |= idBitsToAssign;
+                    }
+                }
+            }
+```
+
+
+
+B) 再次进入dispatchTransformedTouchEvent（）方法,就会执行下面代码中的else分支，这个时候会调用的child.dispatchTouchEvent(),而这个时候的child就是我们参数中第三个传递进来的view ,其实就是递归遍历当前view下面的所有的节点childview ,直到找到事件处理的地方。
+
+```java
+private boolean dispatchTransformedTouchEvent(MotionEvent event, boolean cancel,
+            View child, int desiredPointerIdBits) {
+         
+    if (child == null) {
+            handled = super.dispatchTouchEvent(transformedEvent);
+        } else {
+            final float offsetX = mScrollX - child.mLeft;
+            final float offsetY = mScrollY - child.mTop;
+            transformedEvent.offsetLocation(offsetX, offsetY);
+            if (! child.hasIdentityMatrix()) {
+                transformedEvent.transform(child.getInverseMatrix());
+            }
+            handled = child.dispatchTouchEvent(transformedEvent);
+        }   
+}
+```
+
+
+
+至此，down事件的分发与处理已经完成，那么接下来看看move事件的处理与分发。
+
+
+
+### 2.2)、MOVE 事件的分发与处理
+
+完成了上面的DOWN的分发与处理后，再次分发MOVE事件的时候，还是从ViewGroup的dispatchTouchEvent()方法开始，只是这个时候if (mFirstTouchTarget == null)条件就不成立了，会进入else分支中：
+
+在执行while循环是，  if (alreadyDispatchedToNewTouchTarget && target == newTouchTarget) 这个条件其实就是处理已经分发过的，避免再次分发
+
+1、如果已经分发过的view ,那么就直接返回了
+
+2、如果没有分发过 ,再次进入dispatchTransformedTouchEvent（）方法中,此处需要关注他的第二个参数cancelChild ,关键看一下intercepted的值
+
+ final boolean cancelChild = resetCancelNextUpFlag(target.child) || intercepted;
+
+如果intercepted 在上面是被拦截的，cancelChild 即为true,否则就为false.
+
+```java
+{
+     			// Dispatch to touch targets, excluding the new touch target if we already
+                // dispatched to it.  Cancel touch targets if necessary.
+                TouchTarget predecessor = null;
+                TouchTarget target = mFirstTouchTarget;
+                while (target != null) {
+                    final TouchTarget next = target.next;
+                    /**
+                     newTouchTarget = addTouchTarget(child, idBitsToAssign);
+                     alreadyDispatchedToNewTouchTarget = true;
+                     
+                     private TouchTarget addTouchTarget(@NonNull View child, int pointerIdBits) {
+        					final TouchTarget target = TouchTarget.obtain(child, pointerIdBits);
+       						target.next = mFirstTouchTarget;
+        					mFirstTouchTarget = target;
+        					return target;
+    					}
+                    */
+                    if (alreadyDispatchedToNewTouchTarget && target == newTouchTarget) {
+                        handled = true;
+                    } else {
+                        final boolean cancelChild = resetCancelNextUpFlag(target.child)
+                                || intercepted;
+                        if (dispatchTransformedTouchEvent(ev, cancelChild,
+                                target.child, target.pointerIdBits)) {
+                            handled = true;
+                        }
+                        if (cancelChild) {
+                            if (predecessor == null) {
+                                mFirstTouchTarget = next;
+                            } else {
+                                predecessor.next = next;
+                            }
+                            target.recycle();
+                            target = next;
+                            continue;
+                        }
+                    }
+                    predecessor = target;
+                    target = next;
+}
+```
+
+
+
+3、 cancelChild 为true
+
+下面的代码和donw事件的分发和处理是基本上一样的，如果没有childview节点就交给view的dispatchTouchEvent()来处理，如果有就执行递归调用child.dispatchTouchEvent(event)
+
+```java
+  private boolean dispatchTransformedTouchEvent(MotionEvent event, boolean cancel,
+            View child, int desiredPointerIdBits) {
+        final boolean handled;
+
+        // Canceling motions is a special case.  We don't need to perform any transformations
+        // or filtering.  The important part is the action, not the contents.
+        final int oldAction = event.getAction();
+        if (cancel || oldAction == MotionEvent.ACTION_CANCEL) {
+            event.setAction(MotionEvent.ACTION_CANCEL);
+            if (child == null) {
+                handled = super.dispatchTouchEvent(event);
+            } else {
+                handled = child.dispatchTouchEvent(event);
+            }
+            event.setAction(oldAction);
+            return handled;
+        }
+      
+      	//下面的代码省略
+  }
+```
+
+
+
+4、cancelChild 为false
+
+​	这种情况就和down的事件处理与分发就一样了。直到调用到view的onTouchEvent()方法中
+
+```java
+ private boolean dispatchTransformedTouchEvent(MotionEvent event, boolean cancel,
+            View child, int desiredPointerIdBits) {
+        final boolean handled;
+
+        // Perform any necessary transformations and dispatch.
+        if (child == null) {
+            handled = super.dispatchTouchEvent(transformedEvent);
+        } else {
+            final float offsetX = mScrollX - child.mLeft;
+            final float offsetY = mScrollY - child.mTop;
+            transformedEvent.offsetLocation(offsetX, offsetY);
+            if (! child.hasIdentityMatrix()) {
+                transformedEvent.transform(child.getInverseMatrix());
+            }
+
+            handled = child.dispatchTouchEvent(transformedEvent);
+        }
+
+        // Done.
+        transformedEvent.recycle();
+        return handled;    
+ }
+```
+
+5、view的onTouchEvent() 处理move事件
+
+```java
+public boolean onTouchEvent(MotionEvent event) {
+	switch (action) {
+            case MotionEvent.ACTION_MOVE:
+                    if (clickable) {
+                        drawableHotspotChanged(x, y);
+                    }
+
+                    final int motionClassification = event.getClassification();
+                    final boolean ambiguousGesture =
+                            motionClassification == MotionEvent.CLASSIFICATION_AMBIGUOUS_GESTURE;
+                    int touchSlop = mTouchSlop;
+                    if (ambiguousGesture && hasPendingLongPressCallback()) {
+                        if (!pointInView(x, y, touchSlop)) {
+                            // The default action here is to cancel long press. But instead, we
+                            // just extend the timeout here, in case the classification
+                            // stays ambiguous.
+                            removeLongPressCallback();
+                            long delay = (long) (ViewConfiguration.getLongPressTimeout()
+                                    * mAmbiguousGestureMultiplier);
+                            // Subtract the time already spent
+                            delay -= event.getEventTime() - event.getDownTime();
+                            checkForLongClick(
+                                    delay,
+                                    x,
+                                    y,
+                                    TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__LONG_PRESS);
+                        }
+                        touchSlop *= mAmbiguousGestureMultiplier;
+                    }
+
+                    // Be lenient about moving outside of buttons
+                    if (!pointInView(x, y, touchSlop)) {
+                        // Outside button
+                        // Remove any future long press/tap checks
+                        removeTapCallback();
+                        removeLongPressCallback();
+                        if ((mPrivateFlags & PFLAG_PRESSED) != 0) {
+                            setPressed(false);
+                        }
+                        mPrivateFlags3 &= ~PFLAG3_FINGER_DOWN;
+                    }
+
+                    final boolean deepPress =
+                            motionClassification == MotionEvent.CLASSIFICATION_DEEP_PRESS;
+                    if (deepPress && hasPendingLongPressCallback()) {
+                        // process the long click action immediately
+                        removeLongPressCallback();
+                        checkForLongClick(
+                                0 /* send immediately */,
+                                x,
+                                y,
+                                TOUCH_GESTURE_CLASSIFIED__CLASSIFICATION__DEEP_PRESS);
+                    }
+
+                    break;
+    }
+}
+```
+
+
+
+### 2.3)、UP事件的处理与分发
+
+了解了DOWN ,MOVE 事件的分发与处理后，相信UP事件的处理与分发就简单多了，我们着重看一下view的onTouchEvent()方法对UP事件的处理
+
+```java
+public boolean onTouchEvent(MotionEvent event) {
+	switch (action) {
+            case MotionEvent.ACTION_MOVE:
+                   mPrivateFlags3 &= ~PFLAG3_FINGER_DOWN;
+                    if ((viewFlags & TOOLTIP) == TOOLTIP) {
+                        handleTooltipUp();
+                    }
+                    if (!clickable) {
+                        removeTapCallback();
+                        removeLongPressCallback();
+                        mInContextButtonPress = false;
+                        mHasPerformedLongPress = false;
+                        mIgnoreNextUpEvent = false;
+                        break;
+                    }
+                    boolean prepressed = (mPrivateFlags & PFLAG_PREPRESSED) != 0;
+                    if ((mPrivateFlags & PFLAG_PRESSED) != 0 || prepressed) {
+                        // take focus if we don't have it already and we should in
+                        // touch mode.
+                        boolean focusTaken = false;
+                        if (isFocusable() && isFocusableInTouchMode() && !isFocused()) {
+                            focusTaken = requestFocus();
+                        }
+
+                        if (prepressed) {
+                            // The button is being released before we actually
+                            // showed it as pressed.  Make it show the pressed
+                            // state now (before scheduling the click) to ensure
+                            // the user sees it.
+                            setPressed(true, x, y);
+                        }
+
+                        if (!mHasPerformedLongPress && !mIgnoreNextUpEvent) {
+                            // This is a tap, so remove the longpress check
+                            removeLongPressCallback();
+
+                            // Only perform take click actions if we were in the pressed state
+                            if (!focusTaken) {
+                                // Use a Runnable and post this rather than calling
+                                // performClick directly. This lets other visual state
+                                // of the view update before click actions start.
+                                if (mPerformClick == null) {
+                                    mPerformClick = new PerformClick();
+                                }
+                                if (!post(mPerformClick)) {
+                                    performClickInternal();
+                                }
+                            }
+                        }
+
+                        if (mUnsetPressedState == null) {
+                            mUnsetPressedState = new UnsetPressedState();
+                        }
+
+                        if (prepressed) {
+                            postDelayed(mUnsetPressedState,
+                                    ViewConfiguration.getPressedStateDuration());
+                        } else if (!post(mUnsetPressedState)) {
+                            // If the post failed, unpress right now
+                            mUnsetPressedState.run();
+                        }
+
+                        removeTapCallback();
+                    }
+                    mIgnoreNextUpEvent = false;
+
+                    break;
+    }
+}
+```
+
+特别注意
+
+​	 performClickInternal(); 实际就是处理我们自己实现的OnClickListener的监听者的。
+
+​    因此：TouchListener是在down的时候会回调，而clickListener是在up事件处理的，这样当我们对一个view添加了touchListener和clickListener两个监听时，如果想要clickListener有效，就需要在touchListener的onTouch回调方法中返回false ,让事件继续分发，否则就不会分发了。		
+
+
+
+## 总结：
+
+当发生一个touch事件(down)的时候，如果事件被拦截，那么就该view处理该事件，否则就开始递归遍历view及其child,找到处理该事件的view ,并将该事件添加到目标view的链表中，下一个事件（move）发生的时候，就直接在目标view的链表中进行分发，最后在view的onTouchEvent()中处理；
+
+当view设置了touchListener时，在down事件发生时就会回调到listener中去，listener返回true ,则事件不再下发，否则的话事件继续下发。
+
+当view设置了clickListener时，在up事件发生时就回调到listener中去，在listener的回调中处理该事件。
+
+> 注意：
+>
+> 如果view是叶子节点时，那么如果他没有处理down事件，同样也不会处理move,up事件；
+>
+> 在事件分发和处理过程中，viewGroup主要负责分发事件，而view则负责处理事件；
+>
+> 事件如果被拦截，那就代表事件不能再传递给自己的childview了，也就是自己就是最后一个view，事件需要自己处理；
+
+由此可见，事件冲突的处理方式：
+
+​	内部拦截：在childview中处理事件冲突
+
+​	外部拦截：在parentview中处理事件冲突。
+
+parentView可以抢夺childview的事件，反之childview不能抢夺parentView的事件；view一旦拿到了事件，那么事件由谁处理就是该view说了算了。特别注意的一点就是：这里所说的childview都是指当前view的直接子view ,而不包括childview的childview.
+

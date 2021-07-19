@@ -503,5 +503,7 @@
 ### 5) 完成上面的步骤后，接下来是回调回我们app的application的onCreate()方法中：
 ```java
  mInstrumentation.callApplicationOnCreate(app);
-```                         
+```           
+
+以上就是加载我们的布局和资源文件的全部过程已经相关方法的调用顺序。有了上面的基础，在实现换肤功能时，就有了初步思路了。（具体的换肤思路在后面的实战换肤文章中详说）。              
                                                                       

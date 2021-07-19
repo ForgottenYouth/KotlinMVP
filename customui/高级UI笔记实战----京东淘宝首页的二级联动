@@ -47,28 +47,209 @@ implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
         }
     }
 ```
-这样依次来通知他的parent不要拦截事件
+当一个view调用了该方法后，会依次来通知他的parent不要拦截事件
 
 
 通过Layout Inspector来分析我们当前运行的activity时，发现根布局则是FrameLayout ，而FrameLayout是ViewGroup的子类
 那么我们就从ViewGroup的来进行事件分发：
 进入ViewGroup的dispatchTouchEvent(MotionEvent ev)方法中
 1）
-```java
-            // Check for interception.
-            final boolean intercepted;
-            if (actionMasked == MotionEvent.ACTION_DOWN
-                    || mFirstTouchTarget != null) {
-                final boolean disallowIntercept = (mGroupFlags & FLAG_DISALLOW_INTERCEPT) != 0;
-                if (!disallowIntercept) {
-                    intercepted = onInterceptTouchEvent(ev);
-                    ev.setAction(action); // restore action in case it was changed
-                } else {
-                    intercepted = false;
-                }
-            } else {
-                // There are no touch targets and this action is not an initial down
-                // so this view group continues to intercept touches.
-                intercepted = true;
+```
+       public boolean dispatchTouchEvent(MotionEvent ev) {
+              boolean handled = false;
+              if (onFilterTouchEventForSecurity(ev)) {
+                  
+                  // 判断子view是否请求了不要拦截事件
+                  final boolean intercepted;
+                  if (actionMasked == MotionEvent.ACTION_DOWN
+                          || mFirstTouchTarget != null) {
+                      final boolean disallowIntercept = (mGroupFlags & FLAG_DISALLOW_INTERCEPT) != 0;
+                      if (!disallowIntercept) {
+                          intercepted = onInterceptTouchEvent(ev);
+                          ev.setAction(action); // restore action in case it was changed
+                      } else {
+                          intercepted = false;
+                      }
+                  } else {
+                      intercepted = true;
+                  }
+                  // Check for cancelation.
+                  final boolean canceled = resetCancelNextUpFlag(this)
+                          || actionMasked == MotionEvent.ACTION_CANCEL;
+      
+                  //此处处理没有取消，也没有被拦截的事件
+                  if (!canceled && !intercepted) {
+                      View childWithAccessibilityFocus = ev.isTargetAccessibilityFocus()
+                              ? findChildWithAccessibilityFocus() : null;
+      
+                      if (actionMasked == MotionEvent.ACTION_DOWN
+                              || (split && actionMasked == MotionEvent.ACTION_POINTER_DOWN)
+                              || actionMasked == MotionEvent.ACTION_HOVER_MOVE) {
+                          final int actionIndex = ev.getActionIndex(); // always 0 for down
+                          final int idBitsToAssign = split ? 1 << ev.getPointerId(actionIndex)
+                                  : TouchTarget.ALL_POINTER_IDS;
+      
+                          // Clean up earlier touch targets for this pointer id in case they
+                          // have become out of sync.
+                          removePointersFromTouchTargets(idBitsToAssign);
+      
+                          final int childrenCount = mChildrenCount;
+                          if (newTouchTarget == null && childrenCount != 0) {
+                              final float x =
+                                      isMouseEvent ? ev.getXCursorPosition() : ev.getX(actionIndex);
+                              final float y =
+                                      isMouseEvent ? ev.getYCursorPosition() : ev.getY(actionIndex);
+                              // Find a child that can receive the event.
+                              // Scan children from front to back.  
+                              //这里按照Z轴对view进行排序
+                              final ArrayList<View> preorderedList = buildTouchDispatchChildList();
+                              final boolean customOrder = preorderedList == null
+                                      && isChildrenDrawingOrderEnabled();
+                              final View[] children = mChildren;
+                              for (int i = childrenCount - 1; i >= 0; i--) {
+                                  final int childIndex = getAndVerifyPreorderedIndex(
+                                          childrenCount, i, customOrder);
+                                  final View child = getAndVerifyPreorderedView(
+                                          preorderedList, children, childIndex);
+                                  if (!child.canReceivePointerEvents()
+                                          || !isTransformedTouchPointInView(x, y, child, null)) {
+                                      continue;
+                                  }
+      
+                                    //找到了可以接收点击事件的view 退出循环进行事件分发
+                                  newTouchTarget = getTouchTarget(child);
+                                  if (newTouchTarget != null) {
+                                      // Child is already receiving touch within its bounds.
+                                      // Give it the new pointer in addition to the ones it is handling.
+                                      newTouchTarget.pointerIdBits |= idBitsToAssign;
+                                      break;
+                                  }
+      
+                                  resetCancelNextUpFlag(child);
+                                  if (dispatchTransformedTouchEvent(ev, false, child, idBitsToAssign)) {
+                                      // Child wants to receive touch within its bounds.
+                                      mLastTouchDownTime = ev.getDownTime();
+                                      if (preorderedList != null) {
+                                          // childIndex points into presorted list, find original index
+                                          for (int j = 0; j < childrenCount; j++) {
+                                              if (children[childIndex] == mChildren[j]) {
+                                                  mLastTouchDownIndex = j;
+                                                  break;
+                                              }
+                                          }
+                                      } else {
+                                          mLastTouchDownIndex = childIndex;
+                                      }
+                                      mLastTouchDownX = ev.getX();
+                                      mLastTouchDownY = ev.getY();
+                                      newTouchTarget = addTouchTarget(child, idBitsToAssign);
+                                      alreadyDispatchedToNewTouchTarget = true;
+                                      break;
+                                  }
+      
+                                  // The accessibility focus didn't handle the event, so clear
+                                  // the flag and do a normal dispatch to all children.
+                                  ev.setTargetAccessibilityFocus(false);
+                              }
+                              if (preorderedList != null) preorderedList.clear();
+                          }
+      
+                          if (newTouchTarget == null && mFirstTouchTarget != null) {
+                              // Did not find a child to receive the event.
+                              // Assign the pointer to the least recently added target.
+                              newTouchTarget = mFirstTouchTarget;
+                              while (newTouchTarget.next != null) {
+                                  newTouchTarget = newTouchTarget.next;
+                              }
+                              newTouchTarget.pointerIdBits |= idBitsToAssign;
+                          }
+                      }
+                  }
+      
+                  // Dispatch to touch targets.
+                  if (mFirstTouchTarget == null) {
+                      // No touch targets so treat this as an ordinary view.
+                      handled = dispatchTransformedTouchEvent(ev, canceled, null,
+                              TouchTarget.ALL_POINTER_IDS);
+                  } else {
+                        //开始给找到的view分发点击事件
+                      // Dispatch to touch targets, excluding the new touch target if we already
+                      // dispatched to it.  Cancel touch targets if necessary.
+                      TouchTarget predecessor = null;
+                      TouchTarget target = mFirstTouchTarget;
+                      while (target != null) {
+                          final TouchTarget next = target.next;
+                          if (alreadyDispatchedToNewTouchTarget && target == newTouchTarget) {
+                              handled = true;
+                          } else {
+                              final boolean cancelChild = resetCancelNextUpFlag(target.child)
+                                      || intercepted;
+                              if (dispatchTransformedTouchEvent(ev, cancelChild,
+                                      target.child, target.pointerIdBits)) {
+                                  handled = true;
+                              }
+                              if (cancelChild) {
+                                  if (predecessor == null) {
+                                      mFirstTouchTarget = next;
+                                  } else {
+                                      predecessor.next = next;
+                                  }
+                                  target.recycle();
+                                  target = next;
+                                  continue;
+                              }
+                          }
+                          predecessor = target;
+                          target = next;
+                      }
+                  }
+      
+                  // Update list of touch targets for pointer up or cancel, if needed.
+                  if (canceled
+                          || actionMasked == MotionEvent.ACTION_UP
+                          || actionMasked == MotionEvent.ACTION_HOVER_MOVE) {
+                      resetTouchState();
+                  } else if (split && actionMasked == MotionEvent.ACTION_POINTER_UP) {
+                      final int actionIndex = ev.getActionIndex();
+                      final int idBitsToRemove = 1 << ev.getPointerId(actionIndex);
+                      removePointersFromTouchTargets(idBitsToRemove);
+                  }
+              }
+      
+              if (!handled && mInputEventConsistencyVerifier != null) {
+                  mInputEventConsistencyVerifier.onUnhandledEvent(ev, 1);
+              }
+              return handled;
+          }
+
+
+//下面这个方法是按照view在屏幕的Z轴方向上的顺序进行排序，（Z值越大（view在上层），就越在前面）
+ArrayList<View> buildOrderedChildList() {
+        final int childrenCount = mChildrenCount;
+        if (childrenCount <= 1 || !hasChildWithZ()) return null;
+
+        if (mPreSortedChildren == null) {
+            mPreSortedChildren = new ArrayList<>(childrenCount);
+        } else {
+            // callers should clear, so clear shouldn't be necessary, but for safety...
+            mPreSortedChildren.clear();
+            mPreSortedChildren.ensureCapacity(childrenCount);
+        }
+
+        final boolean customOrder = isChildrenDrawingOrderEnabled();
+        for (int i = 0; i < childrenCount; i++) {
+            // add next child (in child order) to end of list
+            final int childIndex = getAndVerifyPreorderedIndex(childrenCount, i, customOrder);
+            final View nextChild = mChildren[childIndex];
+            final float currentZ = nextChild.getZ();
+
+            // insert ahead of any Views with greater Z
+            int insertIndex = i;
+            while (insertIndex > 0 && mPreSortedChildren.get(insertIndex - 1).getZ() > currentZ) {
+                insertIndex--;
             }
+            mPreSortedChildren.add(insertIndex, nextChild);
+        }
+        return mPreSortedChildren;
+    }
 ```
